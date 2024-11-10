@@ -1,0 +1,59 @@
+version: '3.8'
+
+services:
+  db_service:
+    image: postgres:13
+    container_name: db_service
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    networks:
+      - app_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  init_service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: init_service
+    depends_on:
+      db_service:
+        condition: service_healthy
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    networks:
+      - app_network
+    command: ["python", "/app/init_script.py"]
+
+  app_service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: app_service
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      DB_HOST: db_service
+    ports:
+      - "5000:5000"
+    networks:
+      - app_network
+    command: ["python", "/app/app.py"]
+
+networks:
+  app_network:
+
+volumes:
+  db_data:
